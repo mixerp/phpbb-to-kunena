@@ -1,6 +1,6 @@
 #phpBB to Kunena Migration Script
 
-We have migrated our forum from phpBB to Kunena and would like to share the migration script with the Joomla community. Before you run this script, note the following points:
+We have migrated our forum from phpBB to Kunena and would like to share the migration script with the Joomla community.
 
 Before you run this script, you need to do the ***following modifications*** correctly:
 
