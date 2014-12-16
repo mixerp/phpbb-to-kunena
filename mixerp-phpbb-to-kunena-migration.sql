@@ -19,676 +19,21 @@ along with phpBB2KunenaScript.  If not, see <http://www.gnu.org/licenses/>.
 
 SET @@SESSION.sql_mode='ALLOW_INVALID_DATES';
 
-DROP FUNCTION IF EXISTS phpbb_database_name.get_message_by_post_id;
+DROP FUNCTION IF EXISTS phpbb_database_name.get_alias;
 
 DELIMITER $$
-CREATE FUNCTION phpbb_database_name.get_message_by_post_id(id int) 
-RETURNS mediumtext
-DETERMINISTIC
-BEGIN 
-  RETURN
-  (
-      SELECT post_text
-      FROM phpbb_database_name.phpbb_posts
-      WHERE post_id = id
-  );
-END;
-$$
-DELIMITER ;
-
-DROP FUNCTION IF EXISTS phpbb_database_name.get_user_name;
-
-DELIMITER $$
-CREATE FUNCTION phpbb_database_name.get_user_name(id int) 
-RETURNS varchar(255)
-DETERMINISTIC
-BEGIN 
-  RETURN
-  (
-      SELECT username
-      FROM phpbb_database_name.phpbb_users
-      WHERE user_id = id
-  );
-END;
-$$
-DELIMITER ;
-
-
--- Todo
-DROP FUNCTION IF EXISTS phpbb_database_name.parse_phpbb_date;
-
--- DELIMITER $$
--- CREATE FUNCTION phpbb_database_name.parse_phpbb_date(string varchar(10), dateformat varchar(10)) 
--- RETURNS date
--- DETERMINISTIC
--- BEGIN 
-  -- DECLARE str varchar(10);
-  
-  -- SET str = REPLACE(TRIM(string), ' ', '');
-  
-  -- IF str = '0-0-0' THEN  SET str = '';
-  -- END IF;
-
-
-  -- RETURN
-  -- (
-    -- STR_TO_DATE(str, dateformat)
-  -- );
--- END;
--- $$
--- DELIMITER ;
-
-
-
-DROP FUNCTION IF EXISTS phpbb_database_name.get_hits;
-
-DELIMITER $$
-CREATE FUNCTION phpbb_database_name.get_hits(id int) 
-RETURNS int
-DETERMINISTIC
-BEGIN 
-  RETURN
-  (
-      SELECT topic_views
-      FROM phpbb_database_name.phpbb_topics
-      WHERE topic_id = id
-  );
-END;
-$$
-DELIMITER ;
-
-DROP FUNCTION IF EXISTS phpbb_database_name.get_first_post_id;
-
-DELIMITER $$
-CREATE FUNCTION phpbb_database_name.get_first_post_id(topicid int) 
-RETURNS int
-DETERMINISTIC
-BEGIN 
-  RETURN
-  (
-      SELECT topic_first_post_id
-      FROM phpbb_database_name.phpbb_topics
-      WHERE topic_id = topicid
-      AND topic_moved_id = 0
-);
-END;
-$$
-DELIMITER ;
-
-
-
-DROP FUNCTION IF EXISTS phpbb_database_name.fix_url;
-
-DELIMITER $$
-CREATE FUNCTION phpbb_database_name.fix_url(message text)
-RETURNS text
+CREATE FUNCTION phpbb_database_name.get_alias(str varchar(256))
+RETURNS varchar(256)
 DETERMINISTIC
 BEGIN
-  DECLARE str text;
-  set str = message;
-
-  set str = replace(str, '<a class="postlink" href="', '[url=');
-  set str = replace(str, '">', ']');
-  set str = replace(str, '</a>', '[/url]');
-
+  DECLARE alias varchar(256);
   
-  RETURN str;
+  SET alias = REPLACE(REPLACE(LCASE(REPLACE(CONVERT(TRIM(str) USING ascii), '?', '')),' ','-'), '&amp;','and');
+  
+  RETURN alias;
 END;
 $$
 DELIMITER ;
-
-
-
-DROP FUNCTION IF EXISTS phpbb_database_name.get_topic_id;
-
-DELIMITER $$
-CREATE FUNCTION phpbb_database_name.get_topic_id(id int) 
-RETURNS varchar(255)
-DETERMINISTIC
-BEGIN 
-  RETURN
-  (
-      SELECT topic_id
-      FROM phpbb_database_name.phpbb_posts
-      WHERE post_id = id
-  );
-END;
-$$
-DELIMITER ;
-
-
-DROP FUNCTION IF EXISTS phpbb_database_name.fix_tag;
-
-DELIMITER $$
-CREATE FUNCTION phpbb_database_name.fix_tag(message text, tag_name varchar(20))
-RETURNS text
-DETERMINISTIC
-BEGIN
-  DECLARE str text;
-  DECLARE pos int;
-  DECLARE tag_pos int;
-  DECLARE pattern varchar(100);
-  
-  SET str = message;
-  
-  SET tag_pos = INSTR(str, CONCAT('[',  tag_name));
-  set pos = LOCATE(']', str, tag_pos);
-  
-
-  SET pattern = substring(str, tag_pos + length(tag_name) + 1, pos - tag_pos - length(tag_name) - 1);
-
-
-  SET str = replace(str, pattern, '');
-
-  RETURN str;
-END;
-$$
-DELIMITER ;
-
-DELETE FROM joomla_database_name.jos_kunena_messages_text;
-DELETE FROM joomla_database_name.jos_kunena_messages;
-DELETE FROM joomla_database_name.jos_kunena_topics;
-DELETE FROM joomla_database_name.jos_kunena_aliases;
-DELETE FROM joomla_database_name.jos_kunena_categories;
-DELETE FROM joomla_database_name.jos_kunena_attachments;
-DELETE FROM joomla_database_name.jos_kunena_users;
-DELETE FROM joomla_database_name.jos_kunena_ranks;
-
-CREATE TEMPORARY TABLE IF NOT EXISTS joomla_database_name.jos_users_backup AS (SELECT * FROM joomla_database_name.jos_users);
-DELETE FROM joomla_database_name.jos_user_usergroup_map WHERE user_id NOT IN(SELECT id FROM  joomla_database_name.jos_users_backup);
-DELETE FROM joomla_database_name.jos_users WHERE id NOT IN(SELECT id FROM  joomla_database_name.jos_users_backup);
-DROP TABLE joomla_database_name.jos_users_backup;
-
-
-INSERT INTO joomla_database_name.jos_kunena_ranks
-(
-  rank_id, 
-  rank_title, 
-  rank_min, 
-  rank_special, 
-  rank_image 
-)
-
-SELECT 
-  rank_id, 
-  rank_title, 
-  rank_min, 
-  rank_special, 
-  rank_image 
-FROM phpbb_database_name.phpbb_ranks;
-
-INSERT INTO joomla_database_name.jos_users
-(
-    id, 
-    name, 
-    username, 
-    email, 
-    password, 
-    block, 
-    sendEmail, 
-    registerDate, 
-    lastVisitDate, 
-    activation, 
-    requireReset,
-    params
-)
-SELECT 
-    user_id as id, 
-    username as name, 
-    username, 
-    user_email as email, 
-    user_password as password,  /*lets not store blank passwords.*/
-    0 as block, 
-    0 as sendEmail, 
-    from_unixtime(user_regdate) as registerDate, 
-    from_unixtime(user_lastvisit) as lastVisitDate, 
-    1 as activation, 
-    1 as requireReset, /*The phpBB password cannot be converted to joomla password.*/
-    '' as params
-FROM phpbb_database_name.phpbb_users
-WHERE user_posts > 0;
-
-INSERT INTO joomla_database_name.jos_user_usergroup_map(user_id,group_id)
-SELECT 
-    user_id as id, 
-    (SELECT id FROM joomla_database_name.jos_usergroups WHERE title='Registered') as group_id
-FROM phpbb_database_name.phpbb_users
-WHERE user_posts > 0;
-
-
-
-INSERT INTO joomla_database_name.jos_kunena_users
-(
-  userid, 
-  signature, 
-  moderator, 
-  banned, 
-  ordering, 
-  posts, 
-  avatar, 
-  karma, 
-  karma_time, 
-  group_id, 
-  uhits, 
-  personalText, 
-  gender, 
-  birthdate, 
-  location, 
-  icq, 
-  aim, 
-  yim, 
-  msn, 
-  skype, 
-  twitter, 
-  facebook, 
-  gtalk, 
-  myspace, 
-  linkedin, 
-  delicious, 
-  friendfeed, 
-  digg, 
-  blogspot, 
-  flickr, 
-  bebo, 
-  websitename, 
-  websiteurl, 
-  rank, 
-  hideEmail, 
-  showOnline, 
-  thankyou 
-)
-
-
-SELECT 
-  user_id, 
-  user_sig,
-  0 as moderator,
-  NULL as banned,
-  0 as ordering,
-  user_posts,
-  '' as avatar,
-  0 as karma,
-  0 as karma_time,
-  0 as group_id,
-  0 as uhits, /*phpBB does not support this feature*/
-  '' as personalText,
-  0 as gender, /*phpBB does not support this feature*/
-  STR_TO_DATE(REPLACE(TRIM(user_birthday), ' ', ''), 'dd-mm-yyyy') as birthdate,
-  user_from as location,
-  user_icq 	as  icq, 
-  user_aim 	as aim, 
-  user_yim 	as yim, 
-  user_msnm as msn, 
-  NULL AS skype, /*phpBB does not support this feature*/
-  NULL AS twitter, /*phpBB does not support this feature*/
-  NULL AS facebook, /*phpBB does not support this feature*/
-  NULL AS gtalk, 
-  NULL AS myspace, /*phpBB does not support this feature*/
-  NULL AS linkedin, /*phpBB does not support this feature*/
-  NULL AS delicious, /*phpBB does not support this feature*/
-  NULL AS friendfeed, /*phpBB does not support this feature*/
-  NULL AS digg, /*phpBB does not support this feature*/
-  NULL AS blogspot, /*phpBB does not support this feature*/
-  NULL AS flickr, /*phpBB does not support this feature*/
-  NULL AS bebo, /*phpBB does not support this feature*/
-  user_website as websitename, 
-  user_website as websiteurl, 
-  user_rank as rank, 
-  1 as hideEmail, /*phpBB does not support this feature*/
-  user_allow_viewonline as showOnline, 
-  0 as thankyou /*phpBB does not support this feature*/
-FROM phpbb_database_name.phpbb_users
-WHERE user_posts > 0;
-
-
-
-
-
-INSERT INTO joomla_database_name.jos_kunena_categories
-(
-  id, 
-  parent_id, 
-  name, 
-  alias, 
-  icon_id, 
-  locked, 
-  accesstype, 
-  access, 
-  pub_access, 
-  pub_recurse, 
-  admin_access, 
-  admin_recurse, 
-  ordering, 
-  published, 
-  checked_out, 
-  checked_out_time, 
-  review, 
-  allow_anonymous, 
-  post_anonymous, 
-  hits, 
-  description, 
-  headerdesc, 
-  class_sfx, 
-  allow_polls, 
-  topic_ordering, 
-  numTopics, 
-  numPosts, 
-  last_topic_id, 
-  last_post_id, 
-  last_post_time, 
-  params
-)
-
-
-SELECT 
-  forum_id, 
-  parent_id, 
-  REPLACE(forum_name, '&amp;', '&'), 
-  REPLACE(REPLACE(LCASE(forum_name),' ','-'), '&amp;','and') AS alias, 
-  1 as icon_id,
-  0 as locked,
-  'joomla.level' AS accesstype,
-  1 as access,
-  1 as pub_access,
-  1 as pub_recurse,
-  8 as admin_access,
-  1 as admin_recurse,
-  left_id as ordering,
-  1 as published,
-  0 as checked_out,
-  '0000-00-00 00:00:00' as checked_out_time,
-  0 as review,
-  0 as allow_anonymous,
-  0 as post_anonymous,
-  0 as hits,  
-  forum_desc, 
-  '' as headerdesc,
-  '' as class_sfx,
-  1 as allow_polls,
-  'lastpost' as topic_ordering,
-  forum_topics,
-  forum_posts,
-  phpbb_database_name.get_topic_id(forum_last_post_id) as last_topic_id,
-  forum_last_post_id,
-  forum_last_post_time,
-  '{}' as params
-  FROM phpbb_database_name.phpbb_forums
-ORDER BY forum_id;
-
-
-INSERT INTO joomla_database_name.jos_kunena_aliases(alias, type, item, state)
-SELECT alias, 'catid', id, 0
-FROM joomla_database_name.jos_kunena_categories;
-
-
-INSERT INTO joomla_database_name.jos_kunena_topics
-(
-  id, 
-  category_id, 
-  subject, 
-  icon_id, 
-  locked, 
-  hold, 
-  ordering, 
-  posts, 
-  hits, 
-  attachments, 
-  poll_id, 
-  moved_id, 
-  first_post_id, 
-  first_post_time, 
-  first_post_userid, 
-  first_post_message, 
-  first_post_guest_name, 
-  last_post_id, 
-  last_post_time, 
-  last_post_userid, 
-  last_post_message, 
-  last_post_guest_name, 
-  params
-)
-
-SELECT 
-  topic_id as id, 
-  forum_id as category_id, 
-  topic_title as subject,
-  0 as icon_id, 
-  0 as locked,
-  0 as hold,
-  0 as ordering,
-  topic_replies_real + 1 as posts,
-  topic_views as hits,
-  topic_attachment as attachments,
-  0 as poll_id,
-  topic_moved_id as moved_id,
-  topic_first_post_id as first_post_id,
-  topic_time as first_post_time,
-  topic_poster as first_post_userid,
-  phpbb_database_name.get_message_by_post_id(topic_first_post_id) as first_post_message,
-  topic_first_poster_name as first_post_guest_name,
-  topic_last_post_id as last_post_id,
-  topic_last_post_time as last_post_time,
-  topic_last_poster_id as last_post_userid,
-  phpbb_database_name.get_message_by_post_id(topic_last_post_id) last_post_message,
-  topic_last_poster_name as last_post_guest_name,
-  '' as params
-FROM phpbb_database_name.phpbb_topics;
-
-
-INSERT INTO joomla_database_name.jos_kunena_messages
-(
-  id,
-  parent,
-  thread,
-  catid,
-  name,
-  userid,
-  email,
-  subject,
-  time,
-  ip,
-  topic_emoticon,
-  locked,
-  hold,
-  ordering,
-  hits,
-  moved
-)
-
-SELECT
-  phpbb_database_name.phpbb_posts.post_id as id,
-  0 as parent,
-  phpbb_database_name.phpbb_posts.topic_id as thread,
-  phpbb_database_name.phpbb_posts.forum_id as catid,
-  phpbb_database_name.get_user_name(phpbb_database_name.phpbb_posts.poster_id) as name,
-  poster_id as userid,
-  '' as email,
-  post_subject as subject,
-  post_time as time,
-  poster_id as ip,
-  0 as topic_emoticon,
-  post_edit_locked as locked,
-  0 as hold,
-  0 as ordering,
-  phpbb_database_name.phpbb_topics.topic_views as hits,
-  0 as moved
-FROM phpbb_database_name.phpbb_posts
-INNER JOIN phpbb_database_name.phpbb_topics
-ON phpbb_database_name.phpbb_posts.post_id = phpbb_database_name.phpbb_topics.topic_first_post_id
-WHERE phpbb_database_name.phpbb_topics.topic_moved_id = 0;
-
-
-
-INSERT INTO joomla_database_name.jos_kunena_messages_text(mesid, message)
-SELECT post_id, post_text FROM phpbb_database_name.phpbb_posts
-INNER JOIN phpbb_database_name.phpbb_topics
-ON phpbb_database_name.phpbb_posts.post_id = phpbb_database_name.phpbb_topics.topic_first_post_id
-WHERE phpbb_database_name.phpbb_topics.topic_moved_id = 0;
-
-
-
-
-INSERT INTO joomla_database_name.jos_kunena_messages
-(
-  id,
-  parent,
-  thread,
-  catid,
-  name,
-  userid,
-  email,
-  subject,
-  time,
-  ip,
-  topic_emoticon,
-  locked,
-  hold,
-  ordering,
-  hits,
-  moved
-)
-
-SELECT
-  phpbb_database_name.phpbb_posts.post_id as id,
-  phpbb_database_name.get_first_post_id(topic_id) as parent,
-  phpbb_database_name.phpbb_posts.topic_id as thread,
-  phpbb_database_name.phpbb_posts.forum_id as catid,
-  phpbb_database_name.get_user_name(phpbb_database_name.phpbb_posts.poster_id) as name,
-  poster_id as userid,
-  '' as email,
-  post_subject as subject,
-  post_time as time,
-  poster_id as ip,
-  0 as topic_emoticon,
-  post_edit_locked as locked,
-  0 as hold,
-  0 as ordering,
-  phpbb_database_name.get_hits(topic_id) as hits,
-  0 as moved
-FROM phpbb_database_name.phpbb_posts
-WHERE phpbb_database_name.phpbb_posts.post_id NOT IN
-(
-  SELECT topic_first_post_id FROM phpbb_database_name.phpbb_topics
-);
-
-
-INSERT INTO joomla_database_name.jos_kunena_messages_text(mesid, message)
-SELECT post_id, post_text 
-FROM phpbb_database_name.phpbb_posts
-WHERE phpbb_database_name.phpbb_posts.post_id NOT IN
-(
-  SELECT topic_first_post_id FROM phpbb_database_name.phpbb_topics
-);
-
-
-
-INSERT INTO joomla_database_name.jos_kunena_attachments
-(
-  id, 
-  mesid, 
-  userid, 
-  hash, 
-  size, 
-  folder, 
-  filetype, 
-  filename
-)
-SELECT 
-  attach_id as id, 
-  post_msg_id as mesid, 
-  poster_id as userid,
-  md5(physical_filename) as hash,
-  filesize as size,
-  'media/kunena/attachments/migrated' as folder,
-  mimetype as filetype,
-  CONCAT(physical_filename, '.jpg') as filename  
-FROM phpbb_database_name.phpbb_attachments;
-
-
-
-UPDATE 
-joomla_database_name.jos_kunena_messages_text
-SET message = replace(message, '<!-- m -->', '');
-
-UPDATE 
-joomla_database_name.jos_kunena_messages_text
-SET message = phpbb_database_name.fix_url(message)
-WHERE message LIKE '%<a%>%</a>%';
-
-
-
-UPDATE 
-joomla_database_name.jos_kunena_messages_text
-SET message = phpbb_database_name.fix_tag(message, 'code')
-WHERE message LIKE '%[code%';
-
-UPDATE 
-joomla_database_name.jos_kunena_messages_text
-SET message = phpbb_database_name.fix_tag(message, 'b')
-WHERE message LIKE '%[b%';
-
-
-UPDATE 
-joomla_database_name.jos_kunena_messages_text
-SET message = phpbb_database_name.fix_tag(message, 'quote')
-WHERE message LIKE '%[quote%';
-
-
-/*********************************************
-Convert Emoticons to Kunena
-**********************************************/
-
-
-UPDATE 
-joomla_database_name.jos_kunena_messages_text
-SET message = replace(message, '<!-- s:-) --><img src="{SMILIES_PATH}/icon_e_smile.gif" alt=":-)" title="Smile" /><!-- s:-) -->', ':-)');
-
-UPDATE 
-joomla_database_name.jos_kunena_messages_text
-SET message = replace(message, ' <!-- s:oops: --><img src="{SMILIES_PATH}/icon_redface.gif" alt=":oops:" title="Embarrassed" /><!-- s:oops: -->', ':oops:');
-
-UPDATE 
-joomla_database_name.jos_kunena_messages_text
-SET message = replace(message, '<!-- s:P --><img src="{SMILIES_PATH}/icon_razz.gif" alt=":P" title="Razz" /><!-- s:P -->', ':P');
-
-UPDATE 
-joomla_database_name.jos_kunena_messages_text
-SET message = replace(message, '<!-- s:) --><img src="{SMILIES_PATH}/icon_e_smile.gif" alt=":)" title="Smile" /><!-- s:) -->', ':)');
-
-
-UPDATE 
-joomla_database_name.jos_kunena_messages_text
-SET message = replace(message, '<!-- s:D --><img src="{SMILIES_PATH}/icon_e_biggrin.gif" alt=":D" title="Very Happy" /><!-- s:D -->', ':D');
-
-
-UPDATE 
-joomla_database_name.jos_kunena_messages_text
-SET message = replace(message, '<!-- s:mrgreen: --><img src="{SMILIES_PATH}/icon_mrgreen.gif" alt=":mrgreen:" title="Mr. Green" /><!-- s:mrgreen: -->', ':mrgreen:');
-
-
-UPDATE 
-joomla_database_name.jos_kunena_messages_text
-SET message = replace(message, '<!-- s:( --><img src="{SMILIES_PATH}/icon_e_sad.gif" alt=":(" title="Sad" /><!-- s:( -->', ':(');
-
-
-UPDATE 
-joomla_database_name.jos_kunena_messages_text
-SET message = replace(message, '<!-- s;) --><img src="{SMILIES_PATH}/icon_e_wink.gif" alt=";)" title="Wink" /><!-- s;) -->', ';)');
-
-
-UPDATE 
-joomla_database_name.jos_kunena_messages_text
-SET message = replace(message, '<!-- s:roll: --><img src="{SMILIES_PATH}/icon_rolleyes.gif" alt=":roll:" title="Rolling Eyes" /><!-- s:roll: -->', ':rolleyes:');
-
-
-
-
-
-
-
-
-
-
 
 /*****************************************************************************
     http://forums.mysql.com/read.php?98,246527,246527
@@ -1225,6 +570,703 @@ RETURN TextString ;
 END$$
 
 DELIMITER ;
+
+
+DROP FUNCTION IF EXISTS phpbb_database_name.get_forum_alias;
+
+DELIMITER $$
+CREATE FUNCTION phpbb_database_name.get_forum_alias(id int)
+RETURNS text
+DETERMINISTIC
+BEGIN
+  DECLARE alias text;
+  DECLARE p_id int;
+    
+  SELECT 
+    phpbb_database_name.get_alias(phpbb_database_name.HTML_UnEncode(forum_name)),
+    parent_id
+  INTO
+    alias,
+    p_id
+  FROM phpbb_database_name.phpbb_forums
+  WHERE forum_id = id;
+  
+  IF(p_id <> 0) THEN
+    SELECT 
+      concat(alias, '-', phpbb_database_name.get_alias(phpbb_database_name.HTML_UnEncode(forum_name)))
+    INTO
+      alias
+    FROM phpbb_database_name.phpbb_forums
+    WHERE forum_id = p_id;    
+  END IF;
+
+  RETURN alias;
+END;
+$$
+DELIMITER ;
+
+
+DROP FUNCTION IF EXISTS phpbb_database_name.get_message_by_post_id;
+
+DELIMITER $$
+CREATE FUNCTION phpbb_database_name.get_message_by_post_id(id int) 
+RETURNS mediumtext
+DETERMINISTIC
+BEGIN 
+  RETURN
+  (
+      SELECT post_text
+      FROM phpbb_database_name.phpbb_posts
+      WHERE post_id = id
+  );
+END;
+$$
+DELIMITER ;
+
+DROP FUNCTION IF EXISTS phpbb_database_name.get_user_name;
+
+DELIMITER $$
+CREATE FUNCTION phpbb_database_name.get_user_name(id int) 
+RETURNS varchar(255)
+DETERMINISTIC
+BEGIN 
+  RETURN
+  (
+      SELECT username
+      FROM phpbb_database_name.phpbb_users
+      WHERE user_id = id
+  );
+END;
+$$
+DELIMITER ;
+
+
+-- Todo
+DROP FUNCTION IF EXISTS phpbb_database_name.parse_phpbb_date;
+
+-- DELIMITER $$
+-- CREATE FUNCTION phpbb_database_name.parse_phpbb_date(string varchar(10), dateformat varchar(10)) 
+-- RETURNS date
+-- DETERMINISTIC
+-- BEGIN 
+  -- DECLARE str varchar(10);
+  
+  -- SET str = REPLACE(TRIM(string), ' ', '');
+  
+  -- IF str = '0-0-0' THEN  SET str = '';
+  -- END IF;
+
+
+  -- RETURN
+  -- (
+    -- STR_TO_DATE(str, dateformat)
+  -- );
+-- END;
+-- $$
+-- DELIMITER ;
+
+
+
+DROP FUNCTION IF EXISTS phpbb_database_name.get_hits;
+
+DELIMITER $$
+CREATE FUNCTION phpbb_database_name.get_hits(id int) 
+RETURNS int
+DETERMINISTIC
+BEGIN 
+  RETURN
+  (
+      SELECT topic_views
+      FROM phpbb_database_name.phpbb_topics
+      WHERE topic_id = id
+  );
+END;
+$$
+DELIMITER ;
+
+DROP FUNCTION IF EXISTS phpbb_database_name.get_first_post_id;
+
+DELIMITER $$
+CREATE FUNCTION phpbb_database_name.get_first_post_id(topicid int) 
+RETURNS int
+DETERMINISTIC
+BEGIN 
+  RETURN
+  (
+      SELECT topic_first_post_id
+      FROM phpbb_database_name.phpbb_topics
+      WHERE topic_id = topicid
+      AND topic_moved_id = 0
+);
+END;
+$$
+DELIMITER ;
+
+
+
+DROP FUNCTION IF EXISTS phpbb_database_name.fix_url;
+
+DELIMITER $$
+CREATE FUNCTION phpbb_database_name.fix_url(message text)
+RETURNS text
+DETERMINISTIC
+BEGIN
+  DECLARE str text;
+  set str = message;
+
+  set str = replace(str, '<a class="postlink" href="', '[url=');
+  set str = replace(str, '">', ']');
+  set str = replace(str, '</a>', '[/url]');
+
+  
+  RETURN str;
+END;
+$$
+DELIMITER ;
+
+
+
+DROP FUNCTION IF EXISTS phpbb_database_name.get_topic_id;
+
+DELIMITER $$
+CREATE FUNCTION phpbb_database_name.get_topic_id(id int) 
+RETURNS varchar(255)
+DETERMINISTIC
+BEGIN 
+  RETURN
+  (
+      SELECT topic_id
+      FROM phpbb_database_name.phpbb_posts
+      WHERE post_id = id
+  );
+END;
+$$
+DELIMITER ;
+
+
+DROP FUNCTION IF EXISTS phpbb_database_name.fix_tag;
+
+DELIMITER $$
+CREATE FUNCTION phpbb_database_name.fix_tag(message text, tag_name varchar(20))
+RETURNS text
+DETERMINISTIC
+BEGIN
+  DECLARE str text;
+  DECLARE pos int;
+  DECLARE tag_pos int;
+  DECLARE pattern varchar(100);
+  
+  SET str = message;
+  
+  SET tag_pos = INSTR(str, CONCAT('[',  tag_name));
+  set pos = LOCATE(']', str, tag_pos);
+  
+
+  SET pattern = substring(str, tag_pos + length(tag_name) + 1, pos - tag_pos - length(tag_name) - 1);
+
+
+  SET str = replace(str, pattern, '');
+
+  RETURN str;
+END;
+$$
+DELIMITER ;
+
+DELETE FROM joomla_database_name.jos_kunena_messages_text;
+DELETE FROM joomla_database_name.jos_kunena_messages;
+DELETE FROM joomla_database_name.jos_kunena_topics;
+DELETE FROM joomla_database_name.jos_kunena_aliases;
+DELETE FROM joomla_database_name.jos_kunena_categories;
+DELETE FROM joomla_database_name.jos_kunena_attachments;
+DELETE FROM joomla_database_name.jos_kunena_users;
+DELETE FROM joomla_database_name.jos_kunena_ranks;
+
+CREATE TEMPORARY TABLE IF NOT EXISTS joomla_database_name.jos_users_backup AS (SELECT * FROM joomla_database_name.jos_users);
+DELETE FROM joomla_database_name.jos_user_usergroup_map WHERE user_id NOT IN(SELECT id FROM  joomla_database_name.jos_users_backup);
+DELETE FROM joomla_database_name.jos_users WHERE id NOT IN(SELECT id FROM  joomla_database_name.jos_users_backup);
+DROP TABLE joomla_database_name.jos_users_backup;
+
+
+INSERT INTO joomla_database_name.jos_kunena_ranks
+(
+  rank_id, 
+  rank_title, 
+  rank_min, 
+  rank_special, 
+  rank_image 
+)
+
+SELECT 
+  rank_id, 
+  rank_title, 
+  rank_min, 
+  rank_special, 
+  rank_image 
+FROM phpbb_database_name.phpbb_ranks;
+
+INSERT INTO joomla_database_name.jos_users
+(
+    id, 
+    name, 
+    username, 
+    email, 
+    password, 
+    block, 
+    sendEmail, 
+    registerDate, 
+    lastVisitDate, 
+    activation, 
+    requireReset,
+    params
+)
+SELECT 
+    user_id as id, 
+    username as name, 
+    username, 
+    user_email as email, 
+    user_password as password,  /*lets not store blank passwords.*/
+    0 as block, 
+    0 as sendEmail, 
+    from_unixtime(user_regdate) as registerDate, 
+    from_unixtime(user_lastvisit) as lastVisitDate, 
+    1 as activation, 
+    1 as requireReset, /*The phpBB password cannot be converted to joomla password.*/
+    '' as params
+FROM phpbb_database_name.phpbb_users
+WHERE user_posts > 0;
+
+INSERT INTO joomla_database_name.jos_user_usergroup_map(user_id,group_id)
+SELECT 
+    user_id as id, 
+    (SELECT id FROM joomla_database_name.jos_usergroups WHERE title='Registered') as group_id
+FROM phpbb_database_name.phpbb_users
+WHERE user_posts > 0;
+
+
+
+INSERT INTO joomla_database_name.jos_kunena_users
+(
+  userid, 
+  signature, 
+  moderator, 
+  banned, 
+  ordering, 
+  posts, 
+  avatar, 
+  karma, 
+  karma_time, 
+  group_id, 
+  uhits, 
+  personalText, 
+  gender, 
+  birthdate, 
+  location, 
+  icq, 
+  aim, 
+  yim, 
+  msn, 
+  skype, 
+  twitter, 
+  facebook, 
+  gtalk, 
+  myspace, 
+  linkedin, 
+  delicious, 
+  friendfeed, 
+  digg, 
+  blogspot, 
+  flickr, 
+  bebo, 
+  websitename, 
+  websiteurl, 
+  rank, 
+  hideEmail, 
+  showOnline, 
+  thankyou 
+)
+
+
+SELECT 
+  user_id, 
+  user_sig,
+  0 as moderator,
+  NULL as banned,
+  0 as ordering,
+  user_posts,
+  '' as avatar,
+  0 as karma,
+  0 as karma_time,
+  0 as group_id,
+  0 as uhits, /*phpBB does not support this feature*/
+  '' as personalText,
+  0 as gender, /*phpBB does not support this feature*/
+  STR_TO_DATE(REPLACE(TRIM(user_birthday), ' ', ''), 'dd-mm-yyyy') as birthdate,
+  user_from as location,
+  user_icq 	as  icq, 
+  user_aim 	as aim, 
+  user_yim 	as yim, 
+  user_msnm as msn, 
+  NULL AS skype, /*phpBB does not support this feature*/
+  NULL AS twitter, /*phpBB does not support this feature*/
+  NULL AS facebook, /*phpBB does not support this feature*/
+  NULL AS gtalk, 
+  NULL AS myspace, /*phpBB does not support this feature*/
+  NULL AS linkedin, /*phpBB does not support this feature*/
+  NULL AS delicious, /*phpBB does not support this feature*/
+  NULL AS friendfeed, /*phpBB does not support this feature*/
+  NULL AS digg, /*phpBB does not support this feature*/
+  NULL AS blogspot, /*phpBB does not support this feature*/
+  NULL AS flickr, /*phpBB does not support this feature*/
+  NULL AS bebo, /*phpBB does not support this feature*/
+  user_website as websitename, 
+  user_website as websiteurl, 
+  user_rank as rank, 
+  1 as hideEmail, /*phpBB does not support this feature*/
+  user_allow_viewonline as showOnline, 
+  0 as thankyou /*phpBB does not support this feature*/
+FROM phpbb_database_name.phpbb_users
+WHERE user_posts > 0;
+
+
+
+
+
+INSERT INTO joomla_database_name.jos_kunena_categories
+(
+  id, 
+  parent_id, 
+  name, 
+  alias, 
+  icon_id, 
+  locked, 
+  accesstype, 
+  access, 
+  pub_access, 
+  pub_recurse, 
+  admin_access, 
+  admin_recurse, 
+  ordering, 
+  published, 
+  checked_out, 
+  checked_out_time, 
+  review, 
+  allow_anonymous, 
+  post_anonymous, 
+  hits, 
+  description, 
+  headerdesc, 
+  class_sfx, 
+  allow_polls, 
+  topic_ordering, 
+  numTopics, 
+  numPosts, 
+  last_topic_id, 
+  last_post_id, 
+  last_post_time, 
+  params
+)
+
+
+SELECT 
+  forum_id, 
+  parent_id, 
+  REPLACE(forum_name, '&amp;', '&'), 
+  phpbb_database_name.get_forum_alias(forum_id) AS alias, 
+  1 as icon_id,
+  0 as locked,
+  'joomla.level' AS accesstype,
+  1 as access,
+  1 as pub_access,
+  1 as pub_recurse,
+  8 as admin_access,
+  1 as admin_recurse,
+  left_id as ordering,
+  1 as published,
+  0 as checked_out,
+  '0000-00-00 00:00:00' as checked_out_time,
+  0 as review,
+  0 as allow_anonymous,
+  0 as post_anonymous,
+  0 as hits,  
+  forum_desc, 
+  '' as headerdesc,
+  '' as class_sfx,
+  1 as allow_polls,
+  'lastpost' as topic_ordering,
+  forum_topics,
+  forum_posts,
+  phpbb_database_name.get_topic_id(forum_last_post_id) as last_topic_id,
+  forum_last_post_id,
+  forum_last_post_time,
+  '{}' as params
+  FROM phpbb_database_name.phpbb_forums
+ORDER BY forum_id;
+
+
+INSERT INTO joomla_database_name.jos_kunena_aliases(alias, type, item, state)
+SELECT alias, 'catid', id, 0
+FROM joomla_database_name.jos_kunena_categories;
+
+
+INSERT INTO joomla_database_name.jos_kunena_topics
+(
+  id, 
+  category_id, 
+  subject, 
+  icon_id, 
+  locked, 
+  hold, 
+  ordering, 
+  posts, 
+  hits, 
+  attachments, 
+  poll_id, 
+  moved_id, 
+  first_post_id, 
+  first_post_time, 
+  first_post_userid, 
+  first_post_message, 
+  first_post_guest_name, 
+  last_post_id, 
+  last_post_time, 
+  last_post_userid, 
+  last_post_message, 
+  last_post_guest_name, 
+  params
+)
+
+SELECT 
+  topic_id as id, 
+  forum_id as category_id, 
+  topic_title as subject,
+  0 as icon_id, 
+  0 as locked,
+  0 as hold,
+  0 as ordering,
+  topic_replies_real + 1 as posts,
+  topic_views as hits,
+  topic_attachment as attachments,
+  0 as poll_id,
+  topic_moved_id as moved_id,
+  topic_first_post_id as first_post_id,
+  topic_time as first_post_time,
+  topic_poster as first_post_userid,
+  phpbb_database_name.get_message_by_post_id(topic_first_post_id) as first_post_message,
+  topic_first_poster_name as first_post_guest_name,
+  topic_last_post_id as last_post_id,
+  topic_last_post_time as last_post_time,
+  topic_last_poster_id as last_post_userid,
+  phpbb_database_name.get_message_by_post_id(topic_last_post_id) last_post_message,
+  topic_last_poster_name as last_post_guest_name,
+  '' as params
+FROM phpbb_database_name.phpbb_topics;
+
+
+INSERT INTO joomla_database_name.jos_kunena_messages
+(
+  id,
+  parent,
+  thread,
+  catid,
+  name,
+  userid,
+  email,
+  subject,
+  time,
+  ip,
+  topic_emoticon,
+  locked,
+  hold,
+  ordering,
+  hits,
+  moved
+)
+
+SELECT
+  phpbb_database_name.phpbb_posts.post_id as id,
+  0 as parent,
+  phpbb_database_name.phpbb_posts.topic_id as thread,
+  phpbb_database_name.phpbb_posts.forum_id as catid,
+  phpbb_database_name.get_user_name(phpbb_database_name.phpbb_posts.poster_id) as name,
+  poster_id as userid,
+  '' as email,
+  post_subject as subject,
+  post_time as time,
+  poster_id as ip,
+  0 as topic_emoticon,
+  post_edit_locked as locked,
+  0 as hold,
+  0 as ordering,
+  phpbb_database_name.phpbb_topics.topic_views as hits,
+  0 as moved
+FROM phpbb_database_name.phpbb_posts
+INNER JOIN phpbb_database_name.phpbb_topics
+ON phpbb_database_name.phpbb_posts.post_id = phpbb_database_name.phpbb_topics.topic_first_post_id
+WHERE phpbb_database_name.phpbb_topics.topic_moved_id = 0;
+
+
+
+INSERT INTO joomla_database_name.jos_kunena_messages_text(mesid, message)
+SELECT post_id, post_text FROM phpbb_database_name.phpbb_posts
+INNER JOIN phpbb_database_name.phpbb_topics
+ON phpbb_database_name.phpbb_posts.post_id = phpbb_database_name.phpbb_topics.topic_first_post_id
+WHERE phpbb_database_name.phpbb_topics.topic_moved_id = 0;
+
+
+
+
+INSERT INTO joomla_database_name.jos_kunena_messages
+(
+  id,
+  parent,
+  thread,
+  catid,
+  name,
+  userid,
+  email,
+  subject,
+  time,
+  ip,
+  topic_emoticon,
+  locked,
+  hold,
+  ordering,
+  hits,
+  moved
+)
+
+SELECT
+  phpbb_database_name.phpbb_posts.post_id as id,
+  phpbb_database_name.get_first_post_id(topic_id) as parent,
+  phpbb_database_name.phpbb_posts.topic_id as thread,
+  phpbb_database_name.phpbb_posts.forum_id as catid,
+  phpbb_database_name.get_user_name(phpbb_database_name.phpbb_posts.poster_id) as name,
+  poster_id as userid,
+  '' as email,
+  post_subject as subject,
+  post_time as time,
+  poster_id as ip,
+  0 as topic_emoticon,
+  post_edit_locked as locked,
+  0 as hold,
+  0 as ordering,
+  phpbb_database_name.get_hits(topic_id) as hits,
+  0 as moved
+FROM phpbb_database_name.phpbb_posts
+WHERE phpbb_database_name.phpbb_posts.post_id NOT IN
+(
+  SELECT topic_first_post_id FROM phpbb_database_name.phpbb_topics
+);
+
+
+INSERT INTO joomla_database_name.jos_kunena_messages_text(mesid, message)
+SELECT post_id, post_text 
+FROM phpbb_database_name.phpbb_posts
+WHERE phpbb_database_name.phpbb_posts.post_id NOT IN
+(
+  SELECT topic_first_post_id FROM phpbb_database_name.phpbb_topics
+);
+
+
+
+INSERT INTO joomla_database_name.jos_kunena_attachments
+(
+  id, 
+  mesid, 
+  userid, 
+  hash, 
+  size, 
+  folder, 
+  filetype, 
+  filename
+)
+SELECT 
+  attach_id as id, 
+  post_msg_id as mesid, 
+  poster_id as userid,
+  md5(physical_filename) as hash,
+  filesize as size,
+  'media/kunena/attachments/migrated' as folder,
+  mimetype as filetype,
+  CONCAT(physical_filename, '.jpg') as filename  
+FROM phpbb_database_name.phpbb_attachments;
+
+
+
+UPDATE 
+joomla_database_name.jos_kunena_messages_text
+SET message = replace(message, '<!-- m -->', '');
+
+UPDATE 
+joomla_database_name.jos_kunena_messages_text
+SET message = phpbb_database_name.fix_url(message)
+WHERE message LIKE '%<a%>%</a>%';
+
+
+
+UPDATE 
+joomla_database_name.jos_kunena_messages_text
+SET message = phpbb_database_name.fix_tag(message, 'code')
+WHERE message LIKE '%[code%';
+
+UPDATE 
+joomla_database_name.jos_kunena_messages_text
+SET message = phpbb_database_name.fix_tag(message, 'b')
+WHERE message LIKE '%[b%';
+
+
+UPDATE 
+joomla_database_name.jos_kunena_messages_text
+SET message = phpbb_database_name.fix_tag(message, 'quote')
+WHERE message LIKE '%[quote%';
+
+
+/*********************************************
+Convert Emoticons to Kunena
+**********************************************/
+
+
+UPDATE 
+joomla_database_name.jos_kunena_messages_text
+SET message = replace(message, '<!-- s:-) --><img src="{SMILIES_PATH}/icon_e_smile.gif" alt=":-)" title="Smile" /><!-- s:-) -->', ':-)');
+
+UPDATE 
+joomla_database_name.jos_kunena_messages_text
+SET message = replace(message, ' <!-- s:oops: --><img src="{SMILIES_PATH}/icon_redface.gif" alt=":oops:" title="Embarrassed" /><!-- s:oops: -->', ':oops:');
+
+UPDATE 
+joomla_database_name.jos_kunena_messages_text
+SET message = replace(message, '<!-- s:P --><img src="{SMILIES_PATH}/icon_razz.gif" alt=":P" title="Razz" /><!-- s:P -->', ':P');
+
+UPDATE 
+joomla_database_name.jos_kunena_messages_text
+SET message = replace(message, '<!-- s:) --><img src="{SMILIES_PATH}/icon_e_smile.gif" alt=":)" title="Smile" /><!-- s:) -->', ':)');
+
+
+UPDATE 
+joomla_database_name.jos_kunena_messages_text
+SET message = replace(message, '<!-- s:D --><img src="{SMILIES_PATH}/icon_e_biggrin.gif" alt=":D" title="Very Happy" /><!-- s:D -->', ':D');
+
+
+UPDATE 
+joomla_database_name.jos_kunena_messages_text
+SET message = replace(message, '<!-- s:mrgreen: --><img src="{SMILIES_PATH}/icon_mrgreen.gif" alt=":mrgreen:" title="Mr. Green" /><!-- s:mrgreen: -->', ':mrgreen:');
+
+
+UPDATE 
+joomla_database_name.jos_kunena_messages_text
+SET message = replace(message, '<!-- s:( --><img src="{SMILIES_PATH}/icon_e_sad.gif" alt=":(" title="Sad" /><!-- s:( -->', ':(');
+
+
+UPDATE 
+joomla_database_name.jos_kunena_messages_text
+SET message = replace(message, '<!-- s;) --><img src="{SMILIES_PATH}/icon_e_wink.gif" alt=";)" title="Wink" /><!-- s;) -->', ';)');
+
+
+UPDATE 
+joomla_database_name.jos_kunena_messages_text
+SET message = replace(message, '<!-- s:roll: --><img src="{SMILIES_PATH}/icon_rolleyes.gif" alt=":roll:" title="Rolling Eyes" /><!-- s:roll: -->', ':rolleyes:');
+
 
 
 UPDATE joomla_database_name.jos_kunena_messages_text
