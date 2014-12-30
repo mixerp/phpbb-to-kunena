@@ -12,4 +12,5 @@ Before you run this script, you need to do the ***following modifications*** cor
 * This script will delete all the contents of Kunena forum and joomla users. Make a backup before you proceed.
 * To migrate attachments from phpBB, copy the files inside phpBB attachment folder and paste those on 'media/kunena/attachments/migrated/'. Add file extensions to the files (generally .jpg). Done!
 * This script will migrate all phpBB users. Remember, the existing forum users will have to use the joomla feature "forgot password" in order to reset their password.
+* The script will create a new administrator account "mixerp" with password "secret".
 * This script is licensed under GNU/GPLv2.
