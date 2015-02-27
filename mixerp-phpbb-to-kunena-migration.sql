@@ -894,18 +894,18 @@ $$
 DELIMITER ;
 
 
-CALL phpbb_database_name.create_missing_columns('phpbb', 'phpbb_users', 'user_from', 'varchar(256)');
-CALL phpbb_database_name.create_missing_columns('phpbb', 'phpbb_users', 'user_icq', 'varchar(256)');
-CALL phpbb_database_name.create_missing_columns('phpbb', 'phpbb_users', 'user_aim', 'varchar(256)');
-CALL phpbb_database_name.create_missing_columns('phpbb', 'phpbb_users', 'user_yim', 'varchar(256)');
-CALL phpbb_database_name.create_missing_columns('phpbb', 'phpbb_users', 'user_msnm', 'varchar(256)');
-CALL phpbb_database_name.create_missing_columns('phpbb', 'phpbb_users', 'user_website', 'varchar(256)');
+CALL phpbb_database_name.create_missing_columns('phpbb_database_name', 'phpbb_users', 'user_from', 'varchar(256)');
+CALL phpbb_database_name.create_missing_columns('phpbb_database_name', 'phpbb_users', 'user_icq', 'varchar(256)');
+CALL phpbb_database_name.create_missing_columns('phpbb_database_name', 'phpbb_users', 'user_aim', 'varchar(256)');
+CALL phpbb_database_name.create_missing_columns('phpbb_database_name', 'phpbb_users', 'user_yim', 'varchar(256)');
+CALL phpbb_database_name.create_missing_columns('phpbb_database_name', 'phpbb_users', 'user_msnm', 'varchar(256)');
+CALL phpbb_database_name.create_missing_columns('phpbb_database_name', 'phpbb_users', 'user_website', 'varchar(256)');
 
-CALL phpbb_database_name.create_missing_columns('phpbb', 'phpbb_forums', 'forum_posts', 'int');
-CALL phpbb_database_name.create_missing_columns('phpbb', 'phpbb_forums', 'forum_topics', 'int');
+CALL phpbb_database_name.create_missing_columns('phpbb_database_name', 'phpbb_forums', 'forum_posts', 'int');
+CALL phpbb_database_name.create_missing_columns('phpbb_database_name', 'phpbb_forums', 'forum_topics', 'int');
 
-CALL phpbb_database_name.create_missing_columns('phpbb', 'phpbb_topics', 'forum_posts', 'int');
-CALL phpbb_database_name.create_missing_columns('phpbb', 'phpbb_topics', 'topic_replies_real', 'int');
+CALL phpbb_database_name.create_missing_columns('phpbb_database_name', 'phpbb_topics', 'forum_posts', 'int');
+CALL phpbb_database_name.create_missing_columns('phpbb_database_name', 'phpbb_topics', 'topic_replies_real', 'int');
 
 
 DELETE FROM joomla_database_name.jos_kunena_messages_text;
